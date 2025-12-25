@@ -1,0 +1,1050 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analisi Visure Camerali - V21 Genius</title>
+    
+    <!-- Librerie -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    <!-- Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1e40af;
+            --primary-light: #3b82f6;
+            --secondary: #8b5cf6;
+            --accent: #06b6d4;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --bg-main: #f8fafc;
+            --bg-sidebar: #ffffff;
+            --bg-card: #ffffff;
+            --text-primary: #0f172a;
+            --text-secondary: #64748b;
+            --border: #e2e8f0;
+            --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+            --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1);
+        }
+
+        * { 
+            box-sizing: border-box; 
+            margin: 0;
+            padding: 0;
+        }
+        
+        body { 
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            display: flex; 
+            height: 100vh; 
+            color: var(--text-primary);
+            background: var(--bg-main);
+            overflow: hidden;
+        }
+
+        /* === SIDEBAR === */
+        .sidebar {
+            width: 360px;
+            background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+            padding: 32px 24px;
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            flex-shrink: 0;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .info-header { 
+            background: linear-gradient(135deg, #dbeafe 0%, #e0e7ff 100%);
+            padding: 24px;
+            border-radius: 16px;
+            margin-bottom: 24px;
+            border: 1px solid #bfdbfe;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .info-header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -20%;
+            width: 200px;
+            height: 200px;
+            background: radial-gradient(circle, rgba(59, 130, 246, 0.1) 0%, transparent 70%);
+            border-radius: 50%;
+        }
+
+        .info-header h3 { 
+            color: var(--primary);
+            font-size: 20px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .sidebar-content { 
+            font-size: 15px;
+            line-height: 1.7;
+            color: var(--text-secondary);
+        }
+        
+        .sidebar-content strong { 
+            color: var(--primary);
+            font-weight: 600;
+        }
+        
+        .divider { 
+            height: 1px;
+            background: linear-gradient(90deg, transparent 0%, var(--border) 50%, transparent 100%);
+            margin: 24px 0;
+        }
+        
+        .version-info { 
+            font-size: 14px;
+            color: var(--text-secondary);
+            background: var(--bg-main);
+            padding: 16px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+        }
+
+        .version-info strong {
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        /* === MAIN CONTENT === */
+        .main {
+            flex: 1;
+            background: var(--bg-main);
+            padding: 48px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container-width { 
+            width: 100%; 
+            max-width: 1200px;
+        }
+
+        .main-header { 
+            text-align: center;
+            margin-bottom: 48px;
+            animation: fadeInDown 0.6s ease-out;
+        }
+        
+        .main-header h1 { 
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin: 0 0 12px 0;
+            font-size: 2.75rem;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+        }
+        
+        .main-header h3 { 
+            color: var(--text-secondary);
+            font-weight: 500;
+            margin: 0;
+            font-size: 1.25rem;
+        }
+
+        /* === UPLOAD AREA === */
+        .upload-area {
+            border: 2px dashed var(--border);
+            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+            border-radius: 20px;
+            padding: 64px 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            margin-bottom: 32px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .upload-area::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle, rgba(37, 99, 235, 0.05) 0%, transparent 70%);
+            transition: transform 0.5s ease;
+            border-radius: 50%;
+        }
+
+        .upload-area:hover::before {
+            transform: translate(-50%, -50%) scale(2);
+        }
+
+        .upload-area:hover { 
+            background: linear-gradient(135deg, #ffffff 0%, #eff6ff 100%);
+            border-color: var(--primary);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .upload-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+            display: inline-block;
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .upload-area p { 
+            font-size: 1.125rem;
+            color: var(--text-secondary);
+            margin: 0;
+            font-weight: 500;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* === STATUS BAR === */
+        .status-bar {
+            padding: 20px 24px;
+            border-radius: 12px;
+            margin-bottom: 32px;
+            text-align: center;
+            font-weight: 600;
+            display: none;
+            width: 100%;
+            background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+            color: #065f46;
+            border: 1px solid #6ee7b7;
+            box-shadow: var(--shadow-md);
+            animation: slideInDown 0.4s ease-out;
+        }
+
+        @keyframes slideInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* === COMPANY DATA CARD === */
+        .societary-data-card {
+            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+            border-radius: 20px;
+            padding: 32px;
+            margin: 24px 0;
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow-lg);
+            display: none;
+            animation: fadeInUp 0.5s ease-out;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .societary-data-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 6px;
+            height: 100%;
+            background: linear-gradient(180deg, var(--primary) 0%, var(--secondary) 100%);
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .societary-data-card h3 { 
+            color: var(--primary);
+            margin: 0 0 24px 0;
+            padding-bottom: 16px;
+            border-bottom: 2px solid var(--border);
+            font-size: 1.5rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .grid-2 { 
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        
+        .data-field {
+            background: white;
+            padding: 18px 20px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            transition: all 0.2s ease;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .data-field:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+            border-color: var(--primary-light);
+        }
+
+        .data-field strong { 
+            color: var(--text-secondary);
+            display: block;
+            margin-bottom: 8px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .data-value { 
+            font-weight: 600;
+            color: var(--text-primary);
+            word-break: break-word;
+            font-size: 1rem;
+        }
+
+        /* === RESULTS TABLE === */
+        .results-section { 
+            width: 100%;
+            display: none;
+            margin-top: 32px;
+            animation: fadeInUp 0.5s ease-out;
+        }
+
+        .results-section h3 {
+            margin-bottom: 20px;
+            color: var(--text-primary);
+            font-size: 1.5rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .table-container {
+            background: white;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: var(--shadow-lg);
+            border: 1px solid var(--border);
+        }
+
+        table { 
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th { 
+            background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+            color: var(--text-primary);
+            padding: 18px 20px;
+            text-align: left;
+            font-weight: 700;
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border-bottom: 2px solid var(--border);
+        }
+
+        td { 
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.9375rem;
+            background: white;
+            color: var(--text-primary);
+        }
+
+        tbody tr {
+            transition: all 0.2s ease;
+        }
+
+        tbody tr:hover {
+            background: linear-gradient(90deg, #eff6ff 0%, #f8fafc 100%) !important;
+            transform: translateX(4px);
+        }
+
+        tbody tr:nth-child(even) td {
+            background: #fafafa;
+        }
+
+        tbody tr:nth-child(even):hover td {
+            background: transparent;
+        }
+
+        /* === DOWNLOAD BUTTON === */
+        .btn-download {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            border: none;
+            padding: 14px 28px;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 24px;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            transition: all 0.3s ease;
+            box-shadow: var(--shadow-md);
+        }
+
+        .btn-download:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-xl);
+            background: linear-gradient(135deg, var(--primary-light) 0%, var(--primary) 100%);
+        }
+
+        .btn-download:active {
+            transform: translateY(0);
+        }
+
+        /* === DEBUG CONTAINER === */
+        .debug-container { 
+            margin-top: 48px;
+            width: 100%;
+            border-radius: 16px;
+            overflow: hidden;
+            background: white;
+            box-shadow: var(--shadow-lg);
+            border: 1px solid var(--border);
+        }
+
+        .tabs-header { 
+            display: flex;
+            background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+            border-bottom: 2px solid var(--border);
+        }
+
+        .tab-btn { 
+            padding: 16px 24px;
+            cursor: pointer;
+            background: transparent;
+            border: none;
+            font-weight: 600;
+            color: var(--text-secondary);
+            border-right: 1px solid var(--border);
+            outline: none;
+            transition: all 0.2s ease;
+            font-size: 0.9375rem;
+            position: relative;
+        }
+
+        .tab-btn:hover {
+            background: rgba(37, 99, 235, 0.05);
+            color: var(--primary);
+        }
+
+        .tab-btn.active { 
+            background: white;
+            color: var(--primary);
+        }
+
+        .tab-btn.active::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--primary) 0%, var(--secondary) 100%);
+        }
+
+        .tab-content { 
+            padding: 24px;
+            height: 320px;
+            overflow-y: auto;
+            background: white;
+            font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+            font-size: 13px;
+            display: none;
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+
+        .tab-content.active { 
+            display: block;
+        }
+
+        .tab-content::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .tab-content::-webkit-scrollbar-track {
+            background: var(--bg-main);
+        }
+
+        .tab-content::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 4px;
+        }
+
+        .tab-content::-webkit-scrollbar-thumb:hover {
+            background: var(--text-secondary);
+        }
+
+        .log-cut { 
+            color: #dc2626;
+            font-weight: bold;
+            background: #fee2e2;
+            padding: 4px 8px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+        .log-found { 
+            color: var(--success);
+            font-weight: bold;
+        }
+
+        /* === ANIMATIONS === */
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* === RESPONSIVE === */
+        @media (max-width: 1024px) {
+            .sidebar {
+                width: 300px;
+            }
+            
+            .main {
+                padding: 32px 24px;
+            }
+            
+            .grid-2 {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            body {
+                flex-direction: column;
+            }
+            
+            .sidebar {
+                width: 100%;
+                border-right: none;
+                border-bottom: 1px solid var(--border);
+            }
+            
+            .main {
+                padding: 24px 16px;
+            }
+            
+            .main-header h1 {
+                font-size: 2rem;
+            }
+            
+            .upload-area {
+                padding: 48px 24px;
+            }
+        }
+
+        /* === SCROLL ANIMATIONS === */
+        .main::-webkit-scrollbar {
+            width: 12px;
+        }
+
+        .main::-webkit-scrollbar-track {
+            background: var(--bg-main);
+        }
+
+        .main::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 6px;
+        }
+
+        .main::-webkit-scrollbar-thumb:hover {
+            background: var(--text-secondary);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar">
+        <div class="info-header">
+            <h3>ℹ️ Informazioni sull'app</h3>
+        </div>
+        <div class="sidebar-content">
+            <div class="divider"></div>
+            Carica il PDF di una visura camerale di Telemaco e ottieni:<br><br>
+            • <strong>Dati societari principali</strong> (ragione sociale, sede, forma giuridica, numero addetti).<br><br>
+            • <strong>Elenco delle cariche aziendali</strong> (nome, cognome, codice fiscale, data di nascita, codice catastale).<br><br>
+            Puoi esportare i risultati in formato Excel per effettuare i controlli previsti dal <strong>D.Lgs. 36/2023</strong>.<br><br>
+            <div class="divider"></div>
+            <div class="version-info">
+                <strong>📄 Versione:</strong> 2.0 (Modern UI Edition)<br>
+                <strong>👨‍💻 Sviluppato da:</strong> Luca Bruzzi
+            </div>
+        </div>
+    </div>
+
+    <div class="main">
+        <div class="container-width">
+            <div class="main-header">
+                <h1>Analisi di Visure Camerali TELEMACO</h1>
+                <h3>(per Controlli ai sensi del D.Lgs. 36/2023)</h3>
+            </div>
+
+            <div class="upload-area" id="dropZone" onclick="document.getElementById('fileInput').click()">
+                <div class="upload-icon">📄</div>
+                <p>Trascina qui il PDF o clicca per selezionare</p>
+                <input type="file" id="fileInput" accept=".pdf" style="display:none">
+            </div>
+
+            <div id="statusBox" class="status-bar"></div>
+
+            <div id="companyCard" class="societary-data-card">
+                <h3>📊 Dati Societari</h3>
+                <div class="grid-2">
+                    <div>
+                        <div class="data-field">
+                            <strong>🏢 Ragione Sociale</strong>
+                            <div id="lblRagione" class="data-value">-</div>
+                        </div>
+                        <div class="data-field">
+                            <strong>⚖️ Forma giuridica</strong>
+                            <div id="lblForma" class="data-value">-</div>
+                        </div>
+                        <div class="data-field">
+                            <strong>📍 Sede legale (Città)</strong>
+                            <div id="lblSede" class="data-value">-</div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="data-field">
+                            <strong>🏠 Indirizzo</strong>
+                            <div id="lblIndirizzo" class="data-value">-</div>
+                        </div>
+                        <div class="data-field">
+                            <strong>👥 Numero Addetti</strong>
+                            <div id="lblAddetti" class="data-value">-</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="resultsArea" class="results-section">
+                <h3>📋 Elenco Nominativi</h3>
+                <div class="table-container">
+                    <table id="resTable">
+                        <thead>
+                            <tr>
+                                <th>Cognome</th>
+                                <th>Nomi</th>
+                                <th>Codice Fiscale</th>
+                                <th>Sezione</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+                <button class="btn-download" onclick="downloadExcel()">📥 Scarica il file Excel</button>
+            </div>
+
+            <div id="debugArea" class="debug-container">
+                <div class="tabs-header">
+                    <button class="tab-btn active" onclick="openTab('tabLog')">⚙️ LOG LOGICA</button>
+                    <button class="tab-btn" onclick="openTab('tabTxt')">👁️ TESTO</button>
+                </div>
+                <div id="tabLog" class="tab-content active"></div>
+                <div id="tabTxt" class="tab-content"></div>
+            </div>
+        </div>
+    </div>
+
+<script>
+    const END_MARKERS = ["STORIA DELLE MODIFICHE", "TRASFERIMENTI D'AZIENDA", "ATTIVITÀ, ALBI RUOLI", "AGGIORNAMENTO IMPRESA"];
+    const SECTION_HEADERS = ["SOCI E TITOLARI", "AMMINISTRATORI", "TITOLARI DI CARICHE", "SINDACI", "ELENCO SOCI", "TITOLARI DI ALTRE CARICHE", "TITOLARI DI CARICHE O QUALIFICHE"];
+    const JUNK_WORDS = ["RESPONSABILE", "TECNICO", "BILANCIO", "APPROVAZIONE", "DATA", "ATTO", "NOMINA", "DURATA", "PRESENTAZIONE", "CAPITALE", "SOCIALE", "PROTOCOLLO", "CESSAZIONE", "ISCRITTA", "DELIBERATO", "SOTTOSCRITTO", "VERSATO", "COMUNICAZIONE", "UNICA", "AGENZIA", "ENTRATE", "CODICE", "FISCALE", "NOTIZIA", "DICHIARA", "AGIRE", "SOLA", "DOMICILIO", "RESIDENZA", "TITOLARE", "DIRITTI", "QUOTE", "CARICA", "CONSIGLIERE", "PRESIDENTE", "DELEGATO", "AMMINISTRATORE", "RAPPRESENTANTE", "IMPRESA", "PROMESSA", "RATO", "VALIDO", "SRL", "SPA", "S.R.L.", "S.P.A.", "VIA", "VIALE", "PIAZZA", "CORSO", "VICE", "DIRETTIVO"];
+
+    let peopleMap = new Map();
+    let companyInfo = {};
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+
+    ['dragover','dragleave','drop'].forEach(e => dropZone.addEventListener(e, e => { e.preventDefault(); e.stopPropagation(); }));
+    dropZone.addEventListener('drop', e => handleFile(e.dataTransfer.files[0]));
+    fileInput.addEventListener('change', e => handleFile(e.target.files[0]));
+
+    function openTab(id) {
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+        if(event) event.target.classList.add('active');
+    }
+
+    function addLog(msg) {
+        const div = document.createElement('div');
+        div.innerHTML = msg;
+        div.style.borderBottom = "1px solid #eee";
+        div.style.padding = "2px 0";
+        document.getElementById('tabLog').appendChild(div);
+    }
+
+    async function handleFile(file) {
+        if (!file) return;
+        document.getElementById('statusBox').innerText = 'Elaborazione in corso...';
+        document.getElementById('statusBox').style.display = 'block';
+        peopleMap.clear();
+        document.getElementById('tabLog').innerHTML = '';
+        document.getElementById('resTable').querySelector('tbody').innerHTML = '';
+        document.getElementById('companyCard').style.display = 'none';
+        document.getElementById('resultsArea').style.display = 'none';
+        document.getElementById('debugArea').style.display = 'block';
+
+        try {
+            const arrayBuffer = await file.arrayBuffer();
+            const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+            let allLines = [];
+            for (let i = 1; i <= pdf.numPages; i++) {
+                const page = await pdf.getPage(i);
+                const content = await page.getTextContent();
+                const items = content.items.map(item => ({
+                    str: item.str, y: Math.round(item.transform[5]), x: Math.round(item.transform[4])
+                })).sort((a, b) => (b.y - a.y) || (a.x - b.x));
+                let currentY = -1; let line = "";
+                items.forEach(item => {
+                    if (currentY !== -1 && Math.abs(item.y - currentY) > 5) {
+                        if(line.trim()) allLines.push(line.trim());
+                        line = "";
+                    }
+                    line += item.str + " ";
+                    currentY = item.y;
+                });
+                if(line.trim()) allLines.push(line.trim());
+            }
+
+            extractCompanyDataGenius(allLines);
+            processText(allLines);
+            document.getElementById('statusBox').innerText = '✅ Dati estratti con successo!';
+        } catch (e) {
+            alert("Errore lettura file: " + e.message);
+        }
+    }
+
+    // --- LOGICA ESTRAZIONE DATI GENIUS (CONSERVATA) ---
+    function extractCompanyDataGenius(lines) {
+        companyInfo = { name: "NON TROVATO", form: "-", city: "-", address: "-", employees: "-" };
+
+        let lastIndexLine = 0;
+        for (let i = 0; i < Math.min(lines.length, 120); i++) {
+            if (lines[i].includes("..........")) {
+                lastIndexLine = i;
+            }
+        }
+
+        // 2. RAGIONE SOCIALE
+        for (let i = lastIndexLine; i < lines.length; i++) {
+            let line = lines[i].trim();
+            if (line.startsWith("Registro Imprese")) {
+                let contentAfter = line.replace("Registro Imprese", "").trim();
+                let firstWord = contentAfter.split(/\s+/)[0];
+                if (!firstWord || firstWord !== firstWord.toUpperCase() || !/[A-Z]/.test(firstWord)) {
+                    continue; 
+                }
+                let nameFound = contentAfter;
+                if (i + 1 < lines.length) {
+                    let nextLine = lines[i + 1].trim();
+                    if (nextLine.startsWith("Archivio ufficiale della CCIAA")) {
+                        let remainder = nextLine.replace("Archivio ufficiale della CCIAA", "").trim();
+                        let parts = remainder.split(/\s+/);
+                        let capsWords = [];
+                        for (let w of parts) {
+                            if (w.length > 0 && w === w.toUpperCase() && /[A-Z]/.test(w)) {
+                                capsWords.push(w);
+                            } else {
+                                break; 
+                            }
+                        }
+                        if (capsWords.length > 0) {
+                            nameFound += " " + capsWords.join(" ");
+                        }
+                    }
+                }
+                companyInfo.name = nameFound;
+                break; 
+            }
+        }
+
+        // 3. FORMA GIURIDICA
+        for (let i = 0; i < lines.length; i++) {
+            let line = lines[i].trim();
+            if (line.includes("Forma giuridica") && !line.includes("..........")) {
+                let val = line.split("Forma giuridica")[1].replace(/[:\.]/, "").trim();
+                if (i + 1 < lines.length) {
+                    let nextLine = lines[i + 1].trim();
+                    if (nextLine.length > 0 && nextLine[0] === nextLine[0].toLowerCase() && /[a-z]/.test(nextLine[0])) {
+                        val += " " + nextLine;
+                    }
+                }
+                companyInfo.form = val.toUpperCase();
+                break;
+            }
+        }
+
+        // 4. INDIRIZZO
+        for (let i = lastIndexLine; i < lines.length; i++) {
+            let line = lines[i].trim();
+            if (line.startsWith("Indirizzo")) {
+                let contentSede = line.replace(/Indirizzo/i, "").replace(/Sede/i, "").trim();
+                let words = contentSede.split(/\s+/);
+                let upperParts = words.filter(w => w === w.toUpperCase() && /[A-Z]/.test(w));
+                companyInfo.city = upperParts.join(" ");
+
+                if (i + 1 < lines.length) {
+                    let nextLine = lines[i + 1].trim();
+                    let splitParts = nextLine.split(/CAP/i);
+                    companyInfo.address = splitParts[0].trim();
+                }
+                break; 
+            }
+        }
+
+        // 5. ADDETTI
+        let fullText = lines.join("\n");
+        let am = fullText.match(/Addetti.*?(\d+)/);
+        if(am) companyInfo.employees = am[1];
+
+        document.getElementById('lblRagione').innerText = companyInfo.name;
+        document.getElementById('lblForma').innerText = companyInfo.form;
+        document.getElementById('lblSede').innerText = companyInfo.city;
+        document.getElementById('lblIndirizzo').innerText = companyInfo.address;
+        document.getElementById('lblAddetti').innerText = companyInfo.employees;
+        document.getElementById('companyCard').style.display = 'block';
+    }
+
+    function processText(lines) {
+        let cutIndex = lines.length;
+        for (let i = 0; i < lines.length; i++) {
+            let line = lines[i].toUpperCase();
+            if (/\.{3,}\s*\d+$/.test(lines[i])) continue; 
+            let marker = END_MARKERS.find(m => line.includes(m));
+            if (marker && (lines[i].length < 60 || /^\d/.test(lines[i]))) {
+                cutIndex = i;
+                addLog(`<span class="log-cut">✂️ DOCUMENTO TAGLIATO ALLA RIGA: ${lines[i]}</span>`);
+                break;
+            }
+        }
+        const validLines = lines.slice(0, cutIndex);
+        document.getElementById('tabTxt').innerText = validLines.join("\n");
+        extractNames(validLines);
+    }
+
+    function getValidWords(rawLine) {
+        if (!rawLine) return null;
+        let txt = rawLine.trim();
+        if (/^nat[oa]\s+a/i.test(txt)) return "SKIP"; 
+        if (/\d/.test(txt) && !/nat[oa]\s+a/i.test(txt)) return null; 
+        txt = txt.split(/nat[oa]\s+a/i)[0]; 
+        txt = txt.replace(/CODICE\s*FISCALE[:\.]?/gi, "").replace(/^[•\-\.]+\s*/, "").trim();
+        let words = txt.split(/\s+/);
+        let valid = [];
+        for (let w of words) {
+            if (w.length < 2) continue;
+            if (/[a-z]/.test(w)) break; 
+            if (JUNK_WORDS.includes(w.toUpperCase())) break;
+            valid.push(w);
+        }
+        return valid.length > 0 ? valid : null;
+    }
+
+    function isSurnameSingleWord(fullName, cf) {
+        if (!cf || cf.length < 16) return true;
+        const parts = fullName.trim().split(/\s+/);
+        if (parts.length < 2) return true;
+        const p3 = cf.substring(0, 3); const s3 = cf.substring(3, 6); 
+        const fs = cf.substring(4, 6); const f4 = cf.substring(3, 4);
+        const w1 = parts[0]; const w2 = parts[1]; const w3 = parts.length > 2 ? parts[2] : "";
+        for (let c of p3) if (!w1.includes(c)) return false; 
+        if (w3) {
+            let w3Match = true; for (let c of s3) if (!w3.includes(c)) w3Match = false;
+            if (w3Match) return false; 
+        }
+        let w2Match = true; for (let c of s3) if (!w2.includes(c)) w2Match = false;
+        let w3MatchFS = true; if(w3) for (let c of fs) if (!w3.includes(c)) w3MatchFS = false; else w3MatchFS = false;
+        let w2MatchF4 = w2.includes(f4);
+        if (w2Match || w3MatchFS || w2MatchF4) return true; 
+        return false; 
+    }
+
+    function extractNames(lines) {
+        let currentSection = "Generico";
+        const cfRegex = /([A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z])/;
+        for (let i = 0; i < lines.length; i++) {
+            let line = lines[i].trim();
+            let upperLine = line.toUpperCase();
+            let secMatch = SECTION_HEADERS.find(s => upperLine.includes(s));
+            if (secMatch && line.length < 60) { currentSection = secMatch; continue; }
+            const match = line.match(cfRegex);
+            if (match) {
+                let cf = match[0];
+                let nameParts = [];
+                let textBeforeCF = line.substring(0, line.indexOf(cf));
+                let wordsCurr = getValidWords(textBeforeCF);
+                if (Array.isArray(wordsCurr)) nameParts = wordsCurr;
+                if (nameParts.length < 2) {
+                    if (i > 0) {
+                        let resPrev = getValidWords(lines[i-1]);
+                        if (resPrev === "SKIP") {
+                            if (i > 1) {
+                                let resPrev2 = getValidWords(lines[i-2]);
+                                if (Array.isArray(resPrev2)) nameParts = [...resPrev2, ...nameParts];
+                            }
+                        } else if (Array.isArray(resPrev)) {
+                            nameParts = [...resPrev, ...nameParts];
+                            if (nameParts.length < 2 && i > 1) {
+                                let resPrev2 = getValidWords(lines[i-2]);
+                                if (Array.isArray(resPrev2)) nameParts = [...resPrev2, ...nameParts];
+                            }
+                        }
+                    }
+                }
+                if (nameParts.length > 0) {
+                    let fullName = nameParts.join(" ");
+                    let cognome, nome;
+                    if (isSurnameSingleWord(fullName, cf)) {
+                        cognome = nameParts[0]; nome = nameParts.slice(1).join(" ");
+                    } else {
+                        cognome = nameParts.slice(0, 2).join(" "); nome = nameParts.slice(2).join(" ");
+                    }
+                    if (peopleMap.has(cf)) {
+                        let p = peopleMap.get(cf);
+                        if (!p.sections.includes(currentSection)) p.sections.push(currentSection);
+                    } else {
+                        peopleMap.set(cf, { cognome, nome, cf, sections: [currentSection] });
+                        addLog(`<span class="log-found">✅ Trovato: ${cognome} ${nome}</span>`);
+                    }
+                }
+            }
+        }
+        renderTable();
+    }
+
+    function renderTable() {
+        const tbody = document.querySelector('#resTable tbody');
+        tbody.innerHTML = "";
+        peopleMap.forEach(p => {
+            let row = `<tr><td>${p.cognome}</td><td>${p.nome}</td><td>${p.cf}</td><td>${p.sections.join(", ")}</td></tr>`;
+            tbody.innerHTML += row;
+        });
+        document.getElementById('resultsArea').style.display = 'block';
+    }
+
+    // --- NUOVE FUNZIONI PER DATA DI NASCITA E CODICE CATASTALE (Porting da Python) ---
+    
+    function decodificaDataNascita(cf) {
+        if (!cf || cf.length !== 16) return "N/A";
+        
+        try {
+            const anno_cf = cf.substring(6, 8);
+            const mese_cf = cf.substring(8, 9).toUpperCase();
+            const giorno_cf = cf.substring(9, 11);
+
+            let anno = parseInt(anno_cf, 10);
+            if (isNaN(anno)) return "N/A";
+            
+            // Logica anni 2000 vs 1900
+            if (anno <= 30) anno += 2000;
+            else anno += 1900;
+
+            const mesi = {
+                'A': '01', 'B': '02', 'C': '03', 'D': '04', 'E': '05', 'H': '06',
+                'L': '07', 'M': '08', 'P': '09', 'R': '10', 'S': '11', 'T': '12'
+            };
+
+            if (!mesi[mese_cf]) return "N/A";
+            let mese = mesi[mese_cf];
+
+            let giorno = parseInt(giorno_cf, 10);
+            if (isNaN(giorno)) return "N/A";
+            
+            // Logica donne
+            if (giorno > 31) giorno -= 40;
+
+            // Formattazione GG/MM/AAAA
+            let giornoStr = giorno.toString().padStart(2, '0');
+            return `${giornoStr}/${mese}/${anno}`;
+
+        } catch (e) {
+            return "N/A";
+        }
+    }
+
+    function estraiCodiceCatastale(cf) {
+        if (!cf || cf.length !== 16) return "N/A";
+        return cf.substring(11, 15);
+    }
+
+    // --- FUNZIONE DOWNLOAD AGGIORNATA ---
+    function downloadExcel() {
+        // Mappa i dati includendo le nuove colonne calcolate
+        let data = Array.from(peopleMap.values()).map(p => {
+            let dataNascita = decodificaDataNascita(p.cf);
+            let codCatastale = estraiCodiceCatastale(p.cf);
+            
+            return {
+                "Cognome": p.cognome, 
+                "Nome": p.nome, 
+                "Codice Fiscale": p.cf, 
+                "Data di nascita": dataNascita,
+                "Codice catastale": codCatastale,
+                "Sezione": p.sections.join(", ")
+            };
+        });
+
+        const ws = XLSX.utils.json_to_sheet(data);
+        const wb = XLSX.utils.book_new();
+        
+        // Imposta larghezza colonne (Cognome, Nome, CF, Data, Catastale, Sezione)
+        ws['!cols'] = [{wch:20}, {wch:20}, {wch:25}, {wch:15}, {wch:15}, {wch:40}];
+        
+        XLSX.utils.book_append_sheet(wb, ws, "Nominativi");
+        // Nuovo nome del file
+        XLSX.writeFile(wb, "Elenco per casellario.xlsx");
+    }
+</script>
+</body>
+</html>
