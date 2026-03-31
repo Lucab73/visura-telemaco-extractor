@@ -664,6 +664,7 @@
                                 <th>Nomi</th>
                                 <th>Codice Fiscale</th>
                                 <th>Sezione</th>
+                                <th>Quota %</th>
                             </tr>
                         </thead>
                         <tbody></tbody>
@@ -1046,13 +1047,15 @@
                                 addLog(`&nbsp;&nbsp;&nbsp;&nbsp;🔄 Aggiornato ${cognome}: aggiunta sezione ${currentSection}`);
                             }
                         } else {
+                            const quota = currentSection.includes("SOCI") ? estraiQuota(lines, i) : "";
                             peopleMap.set(cf, { 
                                 cognome, 
                                 nome, 
-                                cf, 
+                                cf,
+                                quota,
                                 sections: [currentSection] 
                             });
-                            addLog(`<span class="log-found">&nbsp;&nbsp;&nbsp;&nbsp;✅ Aggiunto: ${cognome} ${nome}</span>`);
+                            addLog(`<span class="log-found">&nbsp;&nbsp;&nbsp;&nbsp;✅ Aggiunto: ${cognome} ${nome}${quota ? " (" + quota + "%)" : ""}</span>`);
                         }
                     } else {
                         addLog(`<span class="log-warn">&nbsp;&nbsp;&nbsp;&nbsp;⚠️ CF trovato ma impossibile determinare il nome.</span>`);
@@ -1188,98 +1191,86 @@
 
         const w1 = parts[0];
         const w2 = parts[1];
-        const w3 = parts.length > 2 ? parts[2] : "";
 
         // ---------------------------------------------------------------
-        // STEP 1: Calcola match di w1 contro il cognome (p3)
-        //         usando le consonanti estratte.
-        //         Es: VIELE  -> cons="VL"  -> vs "VLR" -> 2/3
-        //         Es: ZAGO   -> cons="ZG"  -> vs "ZGA" -> 2/3 (A non c'è)
-        //              wait: ZAGO -> Z,G,A... no, A è vocale -> cons="ZG"
-        //              ma p3 di ZGALBT = "ZGA" -> Z✅ G✅ A: non c'è in cons
-        //              Però nel CF le vocali vanno nel pattern solo se le
-        //              consonanti non bastano. "ZGA": Z e G sono consonanti,
-        //              A è la prima vocale inserita per completare.
-        //              countCFMatch("ZAGO","ZGA"): cons("ZAGO")="ZG",
-        //              ZG vs ZGA: Z✅ G✅ poi pattern ha A ma cons finisce -> 2
-        //         Es: CHERIDO -> cons="CHRD" -> vs "CHR" -> 3/3
-        //         Es: DE      -> cons="D"    -> vs "DLC" -> 1/3
-        //         Es: LO      -> cons="L"    -> vs "LRO"... 
-        //              "LRO": L e R sono consonanti, O è vocale inserita.
-        //              countCFMatch("LO","LRO"): cons("LO")="L",
-        //              L vs LRO: L✅ poi cons finisce -> 1
-        // ---------------------------------------------------------------
-        const w1Score = countCFMatch(w1, p3);
-        const w2ScoreSurname = countCFMatch(w2, p3);
-        const w2ScoreName    = countCFMatch(w2, s3);
-
-        // ---------------------------------------------------------------
-        // STEP 2: Se w1 copre TUTTO p3 da solo, il cognome è quasi
-        //         certamente singolo. Verifica solo che w2 inizi con
-        //         la prima lettera del nome nel CF (s3[0]) per conferma.
-        //         Questo blocca VIELE ORAZIO (w1 copre VL=2/3, non tutto)
-        //         e lascia passare CHERIDO (3/3), ZAGO (2/3 con A vocale).
+        // STEP 1 — REGOLA PRIMARIA (nessun altro controllo se scatta):
         //
-        //         ECCEZIONE: se p3 contiene vocali (es: ZGA, LRO) il match
-        //         3/3 è impossibile con sole consonanti. In questo caso
-        //         consideriamo "completo" se si coprono tutte le consonanti
-        //         del pattern (ignoriamo le vocali nel pattern).
+        //   Se w1 da sola NON copre p3 → il cognome è CERTAMENTE DOPPIO.
+        //   Non servono ulteriori analisi: w1+w2 = cognome, il resto = nome.
+        //
+        //   Esempi:
+        //     LO RE FERDINANDO  → p3="LRO", cons("LO")="L"  → 1/3 → doppio ✅
+        //     DE LEO FEDERICA   → p3="DLF", cons("DE")="D"  → 1/3 → doppio ✅
+        //     DELLA VALLE ANNA  → p3="DLV", cons("DELLA")="DLL" → copre D,L
+        //                          ma non V → 2/3 < 3 → doppio ✅
+        //     VIELE ORAZIO      → p3="VLR", cons("VIELE")="VL" → 2/3 → doppio ✅
+        //
+        //   ECCEZIONE: se p3 contiene vocali (es: "ZGA", "LRO") il match
+        //   3/3 con sole consonanti è impossibile. In quel caso consideriamo
+        //   "completo" se si coprono tutte le consonanti presenti in p3
+        //   (le vocali del pattern non possono venire da consonanti della parola).
         // ---------------------------------------------------------------
-        const p3Consonants = getConsonants(p3); // Es: "ZGA"->"ZG", "CHR"->"CHR"
+        const p3Consonants = getConsonants(p3); // es: "ZGA"→"ZG", "LRO"→"LR", "CHR"→"CHR"
+        const w1Score = countCFMatch(w1, p3);
+
         const w1CoversP3 = (w1Score === p3.length) ||
                            (w1Score === p3Consonants.length && w1Score >= 2);
 
-        if (w1CoversP3) {
-            // w1 copre il cognome. Ora verifichiamo se w2 è nome o parte del cognome.
+        if (!w1CoversP3) {
+            // w1 non copre p3 → cognome doppio, fine.
+            return false;
+        }
 
-            // Caso COGNOME SINGOLO + NOME (singolo o doppio):
-            // w2 deve iniziare con la prima consonante del nome (s3[0])
-            // Es: CHERIDO MARIO: s3="MMS", s3[0]="M", MARIO inizia con M -> singolo
-            // Es: VIELE ORAZIO:  w1Score=2 < p3.length=3 -> non entra qui
-            // Es: ZAGO ELISABETTA: w1CoversP3=true (2/3 con A vocale),
-            //     s3="LBT", ELISABETTA inizia con E... ma cons(ELISABETTA)="LSBT"
-            //     -> countCFMatch("ELISABETTA","LBT")=3/3 -> w2ScoreName=3 -> singolo ✅
-            if (w2ScoreName >= 2) return true;
+        // ---------------------------------------------------------------
+        // STEP 2 — w1 copre p3 da sola: potrebbe essere cognome singolo
+        //   (ROSSI MARIO) oppure doppio con w1 che già esaurisce le
+        //   consonanti del pattern (RIFFESER MONTI ANDREA LEOPOLDO).
+        //
+        //   Per distinguere i due casi confrontiamo w2 contro il nome (s3):
+        //
+        //   A) Se le consonanti combinate di TUTTE le parole da w2 in poi
+        //      coprono s3 con score >= 2 → w2 è il PRIMO nome → cognome SINGOLO.
+        //      Questo cattura sia "ROSSI MARIO" (w2="MARIO" bastava)
+        //      sia "ROSSI MARIO LUIGI" (combiniamo "MARIOLUIGI").
+        //      Usiamo le parole combinate per non fallire su nomi come
+        //      "ANDREA LEOPOLDO" dove "ANDREA" da sola copre solo N su NRL.
+        //
+        //   B) Se invece le consonanti di w2 matchano meglio il cognome (p3)
+        //      che il nome (s3), e le parole da w3 in poi coprono s3 → cognome DOPPIO.
+        //      Es: RIFFESER MONTI ANDREA LEOPOLDO
+        //          w2="MONTI"→ cons="MNT", countCFMatch("MNT","NRL")=1 (nome), 
+        //          countCFMatch("MNT","RFF")=0 (cognome) ma "ANDREALEOPOLDO"→NRL=3 ✅
+        //
+        //   C) Fallback: prima consonante di s3.
+        // ---------------------------------------------------------------
 
-            // w2 non sembra il nome. Potrebbe essere cognome doppio
-            // (es: DELLA VALLE ANNA) solo se:
-            // - w3 esiste e matcha il nome meglio di w2
-            // - w2 matcha il cognome meglio del nome
-            if (w3) {
-                const w3ScoreName = countCFMatch(w3, s3);
-                if (w3ScoreName >= 2 &&
-                    w2ScoreSurname >= w2ScoreName) {
-                    return false; // Cognome doppio: DELLA VALLE | ANNA
-                }
+        // Score di w2 come primo nome (usando tutte le parole da w2 in poi combinate)
+        const nameFromW2 = parts.slice(1).join(""); // es: "MARIOLUIGI", "MONTIANDRALEOPOLDO"
+        const nameFromW2Score = countCFMatch(nameFromW2, s3);
+
+        // Score di w2 come secondo pezzo del cognome
+        const w2ScoreSurname = countCFMatch(w2, p3);
+        const w2ScoreName    = countCFMatch(w2, s3);
+
+        // 2A: w2 e seguenti coprono bene s3, e w2 da sola copre il nome meglio del cognome
+        //     → cognome singolo (il caso normale: ROSSI MARIO, ZAGO ELISABETTA, ecc.)
+        if (nameFromW2Score >= 2 && w2ScoreName >= w2ScoreSurname) {
+            return true;
+        }
+
+        // 2B: w2 sembra parte del cognome più che del nome, e il nome sta da w3 in poi
+        //     → cognome doppio (es: RIFFESER MONTI | ANDREA LEOPOLDO)
+        if (parts.length > 2) {
+            const nameFromW3 = parts.slice(2).join(""); // es: "ANDREALEOPOLDO"
+            const nameFromW3Score = countCFMatch(nameFromW3, s3);
+            if (nameFromW3Score >= 2 && w2ScoreSurname >= w2ScoreName) {
+                return false;
             }
-
-            // Fallback: prima lettera del nome
-            const s3FirstCons = getConsonants(s3)[0] || s3[0];
-            if (getConsonants(w2)[0] === s3FirstCons) return true;
-
-            return true; // Default conservativo: cognome singolo
         }
 
-        // ---------------------------------------------------------------
-        // STEP 3: w1 NON copre p3 da solo (cognome potenzialmente doppio).
-        //         Verifica se w1+w2 SEPARATAMENTE (non concatenati!)
-        //         coprono insieme p3. Questo è il test chiave per
-        //         DE LUCA, LO RE, LO GIUDICE, ecc.
-        //         splitCFMatch usa le consonanti di w1 poi quelle di w2,
-        //         senza mischiare le due parole in una stringa unica.
-        // ---------------------------------------------------------------
-        if (splitCFMatch(w1, w2, p3)) {
-            return false; // Cognome doppio confermato: DE LUCA, LO RE...
-        }
-
-        // ---------------------------------------------------------------
-        // STEP 4: Né w1 da solo né w1+w2 separati coprono p3.
-        //         Fallback sulla prima lettera del nome.
-        // ---------------------------------------------------------------
-        if (w2.length > 0) {
-            const s3FirstCons = getConsonants(s3)[0] || s3[0];
-            if (getConsonants(w2)[0] === s3FirstCons) return true;
-        }
+        // 2C: Fallback sulla prima consonante del nome
+        const s3FirstCons = getConsonants(s3)[0] || s3[0];
+        if (getConsonants(w2)[0] === s3FirstCons) return true;
 
         // Default conservativo: cognome singolo
         return true;
@@ -1328,6 +1319,7 @@
                 <td>${p.nome}</td>
                 <td>${p.cf}</td>
                 <td>${uniqueSections.join(", ")}</td>
+                <td>${p.quota || ""}</td>
             </tr>`;
             tbody.innerHTML += row;
         });
@@ -1349,15 +1341,62 @@
                 "Codice Fiscale": p.cf, 
                 "Data di nascita": decodificaDataNascita(p.cf),
                 "Codice catastale": estraiCodiceCatastale(p.cf),
-                "Sezione": cleanSections
+                "Sezione": cleanSections,
+                "Quota %": p.quota || ""
             };
         });
 
         const ws = XLSX.utils.json_to_sheet(data);
         const wb = XLSX.utils.book_new();
-        ws['!cols'] = [{wch:20}, {wch:20}, {wch:25}, {wch:15}, {wch:15}, {wch:40}];
+        ws['!cols'] = [{wch:20}, {wch:20}, {wch:25}, {wch:15}, {wch:15}, {wch:40}, {wch:10}];
         XLSX.utils.book_append_sheet(wb, ws, "Nominativi");
         XLSX.writeFile(wb, "Elenco per casellario.xlsx");
+    }
+
+    // --- ESTRAZIONE QUOTA PERCENTUALE ---
+    // Risale le righe precedenti al CF cercando il simbolo "%".
+    // Si ferma appena lo trova, oppure se incontra un altro CF (sconfinerebbe
+    // nel socio precedente). Estrae il numero immediatamente a sinistra del "%",
+    // gestendo eventuali spazi e decimali con virgola o punto.
+    // Es: "a 75 %"  → "75"
+    //     "30,5%"   → "30,5"
+    //     "  20 %"  → "20"
+    const cfRegexCheck = /[A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z]/i;
+
+    function estraiQuota(lines, cfLineIndex) {
+        // Cerca anche sulla riga del CF stesso (caso A: tutto su una riga)
+        // poi risale fino a 4 righe sopra
+        for (let k = 0; k <= 4; k++) {
+            const idx = cfLineIndex - k;
+            if (idx < 0) break;
+            const riga = lines[idx];
+
+            // Se stiamo risalendo (k > 0) e troviamo un altro CF, ci siamo fermati
+            // prima del socio precedente: usciamo senza risultato
+            if (k > 0 && cfRegexCheck.test(riga)) break;
+
+            const posPercent = riga.indexOf("%");
+            if (posPercent === -1) continue;
+
+            // Trovato "%": raccogli i caratteri a sinistra
+            let j = posPercent - 1;
+
+            // Salta spazi bianchi tra il numero e il "%"
+            while (j >= 0 && riga[j] === " ") j--;
+
+            // Raccogli cifre (e virgola/punto decimale) andando a sinistra
+            let numStr = "";
+            while (j >= 0 && (/\d/.test(riga[j]) || riga[j] === "," || riga[j] === ".")) {
+                numStr = riga[j] + numStr;
+                j--;
+            }
+
+            // Pulizia: rimuovi virgola/punto iniziale o finale rimasto
+            numStr = numStr.replace(/^[,.]|[,.]$/, "");
+
+            if (numStr.length > 0) return numStr;
+        }
+        return ""; // Nessuna quota trovata
     }
 </script>
 </body>
