@@ -1164,22 +1164,39 @@
         return patPos === cfPattern.length; // true solo se tutte coperte
     }
 
-    // --- FUNZIONE PRINCIPALE v2.9: determina se il cognome è una o due parole ---
+    // --- FUNZIONE PRINCIPALE v3.0: determina se il cognome è una o due parole ---
     //
-    // Strategia:
-    // Il CF italiano codifica il COGNOME nei caratteri 0-2 (p3) e il NOME nei
-    // caratteri 3-5 (s3), usando le consonanti in ordine di apparizione.
-    // Per capire dove finisce il cognome e inizia il nome, confrontiamo ogni
-    // parola del nome completo contro p3 e s3 usando le CONSONANTI ESTRATTE,
-    // non la stringa grezza (evita falsi positivi da concatenazione).
+    // Strategia a due stadi:
+    //
+    // STADIO 1 — Regola certa:
+    //   Se w1 NON copre p3 da sola → cognome doppio senza ulteriori analisi.
+    //   Es: LO RE (p3=LRO, cons(LO)=L → 1/3), DE LEO (p3=DLF, cons(DE)=D → 1/3)
+    //
+    // STADIO 2 — w1 copre p3: confronto tra i due possibili tagli.
+    //   Quando w1 esaurisce già da sola le consonanti di p3, il cognome potrebbe
+    //   essere singolo (ROSSI | MARIO) oppure doppio dove la seconda parola non
+    //   aggiunge consonanti utili al pattern (DELLA | VALLE | DIEGO,
+    //   TRONCHETTI | PROVERA | MARCO, RIFFESER | MONTI | ANDREA LEOPOLDO).
+    //
+    //   Per scegliere calcoliamo lo SCORE COMBINATO di entrambi i tagli:
+    //
+    //   Taglio SINGOLO:  cognome = w1,    nome = w2+w3+...
+    //     scoreS = match(w1, p3) + match(w2w3..., s3)
+    //
+    //   Taglio DOPPIO:   cognome = w1+w2, nome = w3+w4+...
+    //     scoreD = match(w1w2, p3) + match(w3w4..., s3)
+    //     (il match cognome di w1w2 non può essere peggiore di w1 da solo,
+    //      perché w2 può solo aggiungere consonanti già matchate o nuove)
+    //
+    //   Vince il taglio con score combinato più alto.
+    //   In caso di parità si preferisce il taglio SINGOLO (più conservativo).
     //
     // Casi gestiti:
-    //   COGNOME SINGOLO + NOME SINGOLO:    ROSSI MARIO
-    //   COGNOME SINGOLO + NOME DOPPIO:     CHERIDO MARIO MASSIMO
-    //   COGNOME DOPPIO  + NOME SINGOLO:    DE LUCA MARIO, LO RE FERDINANDO
-    //   COGNOME DOPPIO  + NOME DOPPIO:     DELLA VALLE ANNA MARIA
-    //   COGNOME SINGOLO con apostrofo:     CANE' FABIO COSMO DOMENICO
-    //   COGNOME che "sembra" doppio:       VIELE ORAZIO, ZAGO ELISABETTA
+    //   COGNOME SINGOLO + NOME SINGOLO:      ROSSI MARIO
+    //   COGNOME SINGOLO + NOME DOPPIO:       SIMONTACCHI STEFANO ADELFIO ITALO
+    //   COGNOME DOPPIO  + NOME SINGOLO:      LO RE FERDINANDO, DE LEO FEDERICA
+    //   COGNOME DOPPIO  + NOME DOPPIO:       DELLA VALLE DIEGO, RIFFESER MONTI ANDREA LEOPOLDO
+    //   COGNOME DOPPIO  w1 copre p3:         TRONCHETTI PROVERA MARCO, DELLA VALLE DIEGO
     //
     function isSurnameSingleWord(fullName, cf) {
         if (!cf || cf.length < 16) return true;
@@ -1193,87 +1210,56 @@
         const w2 = parts[1];
 
         // ---------------------------------------------------------------
-        // STEP 1 — REGOLA PRIMARIA (nessun altro controllo se scatta):
-        //
-        //   Se w1 da sola NON copre p3 → il cognome è CERTAMENTE DOPPIO.
-        //   Non servono ulteriori analisi: w1+w2 = cognome, il resto = nome.
-        //
-        //   Esempi:
-        //     LO RE FERDINANDO  → p3="LRO", cons("LO")="L"  → 1/3 → doppio ✅
-        //     DE LEO FEDERICA   → p3="DLF", cons("DE")="D"  → 1/3 → doppio ✅
-        //     DELLA VALLE ANNA  → p3="DLV", cons("DELLA")="DLL" → copre D,L
-        //                          ma non V → 2/3 < 3 → doppio ✅
-        //     VIELE ORAZIO      → p3="VLR", cons("VIELE")="VL" → 2/3 → doppio ✅
-        //
-        //   ECCEZIONE: se p3 contiene vocali (es: "ZGA", "LRO") il match
-        //   3/3 con sole consonanti è impossibile. In quel caso consideriamo
-        //   "completo" se si coprono tutte le consonanti presenti in p3
-        //   (le vocali del pattern non possono venire da consonanti della parola).
+        // STADIO 1 — Regola primaria certa.
+        //   Se w1 non copre p3 → cognome doppio, fine.
+        //   ECCEZIONE vocali: se p3 contiene vocali (es "LRO", "ZGA") il
+        //   match 3/3 è impossibile con sole consonanti; consideriamo
+        //   "coperto" se si esauriscono tutte le consonanti di p3.
         // ---------------------------------------------------------------
-        const p3Consonants = getConsonants(p3); // es: "ZGA"→"ZG", "LRO"→"LR", "CHR"→"CHR"
+        const p3Consonants = getConsonants(p3);
         const w1Score = countCFMatch(w1, p3);
-
         const w1CoversP3 = (w1Score === p3.length) ||
-                           (w1Score === p3Consonants.length && w1Score >= 2);
+                           (w1Score === p3Consonants.length);
 
         if (!w1CoversP3) {
-            // w1 non copre p3 → cognome doppio, fine.
-            return false;
+            return false; // cognome certamente doppio
         }
 
         // ---------------------------------------------------------------
-        // STEP 2 — w1 copre p3 da sola: potrebbe essere cognome singolo
-        //   (ROSSI MARIO) oppure doppio con w1 che già esaurisce le
-        //   consonanti del pattern (RIFFESER MONTI ANDREA LEOPOLDO).
+        // STADIO 2 — w1 copre p3 da sola: confronto score combinato.
         //
-        //   Per distinguere i due casi confrontiamo w2 contro il nome (s3):
+        //   scoreS = taglio singolo:  cognome=w1,    nome=w2+w3+...
+        //   scoreD = taglio doppio:   cognome=w1+w2, nome=w3+w4+...
         //
-        //   A) Se le consonanti combinate di TUTTE le parole da w2 in poi
-        //      coprono s3 con score >= 2 → w2 è il PRIMO nome → cognome SINGOLO.
-        //      Questo cattura sia "ROSSI MARIO" (w2="MARIO" bastava)
-        //      sia "ROSSI MARIO LUIGI" (combiniamo "MARIOLUIGI").
-        //      Usiamo le parole combinate per non fallire su nomi come
-        //      "ANDREA LEOPOLDO" dove "ANDREA" da sola copre solo N su NRL.
-        //
-        //   B) Se invece le consonanti di w2 matchano meglio il cognome (p3)
-        //      che il nome (s3), e le parole da w3 in poi coprono s3 → cognome DOPPIO.
-        //      Es: RIFFESER MONTI ANDREA LEOPOLDO
-        //          w2="MONTI"→ cons="MNT", countCFMatch("MNT","NRL")=1 (nome), 
-        //          countCFMatch("MNT","RFF")=0 (cognome) ma "ANDREALEOPOLDO"→NRL=3 ✅
-        //
-        //   C) Fallback: prima consonante di s3.
+        //   Se non c'è w3 il taglio doppio non ha nome → scoreD penalizzato.
         // ---------------------------------------------------------------
 
-        // Score di w2 come primo nome (usando tutte le parole da w2 in poi combinate)
-        const nameFromW2 = parts.slice(1).join(""); // es: "MARIOLUIGI", "MONTIANDRALEOPOLDO"
-        const nameFromW2Score = countCFMatch(nameFromW2, s3);
+        // Taglio SINGOLO: nome = tutte le parole da w2 in poi, concatenate
+        const nameFromW2     = parts.slice(1).join("");
+        const scoreS_surname = w1Score; // w1 copre già p3
+        const scoreS_name    = countCFMatch(nameFromW2, s3);
+        const scoreS         = scoreS_surname + scoreS_name;
 
-        // Score di w2 come secondo pezzo del cognome
-        const w2ScoreSurname = countCFMatch(w2, p3);
-        const w2ScoreName    = countCFMatch(w2, s3);
+        // Taglio DOPPIO: cognome = w1+w2 concatenati, nome = da w3 in poi
+        const surnameW1W2    = w1 + w2;
+        const nameFromW3     = parts.length > 2 ? parts.slice(2).join("") : "";
+        const scoreD_surname = countCFMatch(surnameW1W2, p3);
+        const scoreD_name    = nameFromW3 ? countCFMatch(nameFromW3, s3) : 0;
+        const scoreD         = scoreD_surname + scoreD_name;
 
-        // 2A: w2 e seguenti coprono bene s3, e w2 da sola copre il nome meglio del cognome
-        //     → cognome singolo (il caso normale: ROSSI MARIO, ZAGO ELISABETTA, ecc.)
-        if (nameFromW2Score >= 2 && w2ScoreName >= w2ScoreSurname) {
-            return true;
+        // Vince il taglio con score più alto.
+        // SPAREGGIO in caso di parità: se la prima consonante di w2 non coincide
+        // con la prima consonante attesa del nome (s3[0]), w2 è probabilmente
+        // parte del cognome e non il primo nome → cognome doppio.
+        // Es parità DOPPIO: VALLE→V vs s3=DGI→D (false), PROVERA→P vs s3=MRC→M (false)
+        // Es parità SINGOLO: MARIO→M vs s3=MRA→M (true), ENRICO→N vs s3=NCM→N (true)
+        if (scoreD > scoreS) return false;
+        if (scoreD === scoreS) {
+            const s3FirstCons = getConsonants(s3)[0] || s3[0];
+            const w2FirstCons = getConsonants(w2)[0] || w2[0];
+            if (w2FirstCons !== s3FirstCons) return false; // spareggio → doppio
         }
-
-        // 2B: w2 sembra parte del cognome più che del nome, e il nome sta da w3 in poi
-        //     → cognome doppio (es: RIFFESER MONTI | ANDREA LEOPOLDO)
-        if (parts.length > 2) {
-            const nameFromW3 = parts.slice(2).join(""); // es: "ANDREALEOPOLDO"
-            const nameFromW3Score = countCFMatch(nameFromW3, s3);
-            if (nameFromW3Score >= 2 && w2ScoreSurname >= w2ScoreName) {
-                return false;
-            }
-        }
-
-        // 2C: Fallback sulla prima consonante del nome
-        const s3FirstCons = getConsonants(s3)[0] || s3[0];
-        if (getConsonants(w2)[0] === s3FirstCons) return true;
-
-        // Default conservativo: cognome singolo
-        return true;
+        return true; // cognome singolo
     }
 
     function decodificaDataNascita(cf) {
