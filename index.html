@@ -872,7 +872,7 @@
         // INDIRIZZO
         for (let i = lastIndexLine; i < lines.length; i++) {
             let line = lines[i].trim();
-            if (line.startsWith("Indirizzo")) {
+            if (line.includes("Indirizzo")) {
                 let contentSede = line.replace(/Indirizzo/i, "").replace(/Sede/i, "").trim();
                 // Prendi solo parole maiuscole per la città
                 let words = contentSede.split(/\s+/);
