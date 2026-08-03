@@ -1258,6 +1258,17 @@
             const s3FirstCons = getConsonants(s3)[0] || s3[0];
             const w2FirstCons = getConsonants(w2)[0] || w2[0];
             if (w2FirstCons !== s3FirstCons) return false; // spareggio → doppio
+
+            // ECCEZIONE: la sola prima consonante coincidente non basta a
+            // garantire che w2 sia davvero il nome proprio. Caso reale:
+            // "ROVERSI MONACO MAURO" (CF ...RVRMRA...) -> w2="MONACO" inizia
+            // per "M" come s3="MRA", ma MONACO copre SOLO la "M" e non la "R"
+            // successiva (mentre "MAURO" copre sia M che R). Se w2 da sola
+            // non copre tutte le consonanti attese del nome, è quasi
+            // certamente la seconda parola del cognome, non il nome -> doppio.
+            const s3ConsLen = getConsonants(s3).length || s3.length;
+            const w2AloneMatch = countCFMatch(w2, s3);
+            if (w2AloneMatch < s3ConsLen) return false; // spareggio raffinato → doppio
         }
         return true; // cognome singolo
     }
