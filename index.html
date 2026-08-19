@@ -660,6 +660,7 @@
                     <table id="resTable">
                         <thead>
                             <tr>
+                                <th style="width:36px;"><input type="checkbox" id="selectAllChk" onclick="toggleSelectAll(this)"></th>
                                 <th>Cognome</th>
                                 <th>Nomi</th>
                                 <th>Codice Fiscale</th>
@@ -671,6 +672,7 @@
                     </table>
                 </div>
                 <button class="btn-download" onclick="downloadExcel()">📥 Scarica il file Excel</button>
+                <button class="btn-download" onclick="downloadCSV()">📥 Scarica CSV (selezionati)</button>
             </div>
 
             <div id="debugArea" class="debug-container">
@@ -1297,6 +1299,28 @@
         return cf.substring(11, 15);
     }
 
+    // Replica la formula Excel:
+    // =SE(STRINGA.ESTRAI(I2;12;1)="Z";STRINGA.ESTRAI(I2;12;4);"Z000")
+    // Posizione 12 (1-based) = indice 11 (0-based) del CF
+    function estraiCodiceNazione(cf) {
+        if (!cf || cf.length !== 16) return "Z000";
+        const carattere12 = cf.charAt(11).toUpperCase();
+        if (carattere12 === "Z") {
+            return cf.substring(11, 15).toUpperCase();
+        }
+        return "Z000";
+    }
+
+    // Replica la formula Excel:
+    // =SE(VALORE(STRINGA.ESTRAI(I2;10;2))>31; "F"; "M")
+    // Posizione 10 (1-based), 2 caratteri = indici 9-10 (0-based) del CF
+    function estraiSesso(cf) {
+        if (!cf || cf.length !== 16) return "";
+        const val = parseInt(cf.substring(9, 11), 10);
+        if (isNaN(val)) return "";
+        return val > 31 ? "F" : "M";
+    }
+
     function renderTable() {
         const tbody = document.querySelector('#resTable tbody');
         tbody.innerHTML = "";
@@ -1312,6 +1336,7 @@
             let uniqueSections = [...new Set(cleanSections)];
 
             let row = `<tr>
+                <td><input type="checkbox" class="rowChk" value="${p.cf}" checked></td>
                 <td>${p.cognome}</td>
                 <td>${p.nome}</td>
                 <td>${p.cf}</td>
@@ -1321,10 +1346,24 @@
             tbody.innerHTML += row;
         });
         document.getElementById('resultsArea').style.display = 'block';
+
+        const selectAllChk = document.getElementById('selectAllChk');
+        if (selectAllChk) selectAllChk.checked = true;
+    }
+
+    function toggleSelectAll(chk) {
+        document.querySelectorAll('.rowChk').forEach(c => c.checked = chk.checked);
     }
 
     function downloadExcel() {
-        let data = Array.from(peopleMap.values()).map(p => {
+        const checked = Array.from(document.querySelectorAll('.rowChk:checked')).map(c => c.value);
+
+        if (checked.length === 0) {
+            alert("Seleziona almeno un nominativo da esportare.");
+            return;
+        }
+
+        let data = checked.map(cf => peopleMap.get(cf)).filter(Boolean).map(p => {
             let cleanSections = [...new Set(p.sections.map(s => {
                 if(s.includes("SOCI")) return "SOCIO";
                 if(s.includes("AMMINISTRATORI")) return "AMMINISTRATORE";
@@ -1348,6 +1387,65 @@
         ws['!cols'] = [{wch:20}, {wch:20}, {wch:25}, {wch:15}, {wch:15}, {wch:40}, {wch:10}];
         XLSX.utils.book_append_sheet(wb, ws, "Nominativi");
         XLSX.writeFile(wb, "Elenco per casellario.xlsx");
+    }
+
+    // --- EXPORT CSV (solo righe selezionate, senza intestazioni) ---
+    // Struttura colonne:
+    // A: Cognome | B: Nome | C: Codice catastale comune | D: (vuota)
+    // E: Data di nascita | F: Codice nazione | G: (vuota) | H: Sesso | I: Codice fiscale
+    function csvEscapeField(val) {
+        val = (val === null || val === undefined) ? "" : String(val);
+        if (val.includes(";") || val.includes('"') || val.includes("\n") || val.includes("\r")) {
+            val = '"' + val.replace(/"/g, '""') + '"';
+        }
+        return val;
+    }
+
+    function downloadCSV() {
+        const checked = Array.from(document.querySelectorAll('.rowChk:checked')).map(c => c.value);
+
+        if (checked.length === 0) {
+            alert("Seleziona almeno un nominativo da esportare.");
+            return;
+        }
+
+        const rows = [];
+        checked.forEach(cf => {
+            const p = peopleMap.get(cf);
+            if (!p) return;
+
+            const cognome = p.cognome || "";
+            const nome = p.nome || "";
+            const codCatastale = estraiCodiceCatastale(cf);
+            const dataNascita = decodificaDataNascita(cf);
+            const codNazione = estraiCodiceNazione(cf);
+            const sesso = estraiSesso(cf);
+
+            const fields = [
+                cognome,          // A - Cognome
+                nome,             // B - Nome
+                codCatastale,     // C - Codice catastale del comune
+                "",                // D - vuota
+                dataNascita,       // E - Data di nascita
+                codNazione,        // F - Codice della nazione
+                "",                // G - vuota
+                sesso,             // H - Sesso
+                cf                 // I - Codice fiscale
+            ];
+
+            rows.push(fields.map(csvEscapeField).join(";"));
+        });
+
+        const csvContent = rows.join("\n") + "\n";
+        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "Elenco per casellario.csv";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
     }
 
     // --- ESTRAZIONE QUOTA PERCENTUALE ---
